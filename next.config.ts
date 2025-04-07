@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   experimental: {
     ppr: true,
   },
+  openTelemetry: {
+    enabled: false,
+  },
   images: {
     remotePatterns: [
       {

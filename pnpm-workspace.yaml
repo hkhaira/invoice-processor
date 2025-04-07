@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - better-sqlite3
+  - bufferutil
+  - esbuild
+  - sharp
