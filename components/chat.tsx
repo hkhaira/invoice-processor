@@ -14,7 +14,6 @@ import { MultimodalInput } from './multimodal-input';
 import { Messages } from './messages';
 import type { VisibilityType } from './visibility-selector';
 import { useBlockSelector } from '@/hooks/use-block';
-import { toast } from 'sonner';
 
 export function Chat({
   id,
@@ -51,8 +50,7 @@ export function Chat({
       mutate('/api/history');
       setInvoiceProcessingStatus(undefined);
     },
-    onError: (error) => {
-      toast.error('An error occurred, please try again!');
+    onError: () => {
       setInvoiceProcessingStatus(undefined);
     },
   });
@@ -71,14 +69,22 @@ export function Chat({
     }
 
     if (!attachments.length) {
-      toast.error('Please attach an invoice file first');
+      append({
+        id: generateUUID(),
+        role: 'assistant',
+        content: 'Please attach an invoice file first.',
+      });
       return;
     }
 
     const invoiceFile = attachments[0];
     const contentType = invoiceFile.contentType || '';
     if (!['application/pdf', 'image/jpeg', 'image/png'].includes(contentType)) {
-      toast.error('Please attach a valid invoice file (PDF, JPEG, or PNG)');
+      append({
+        id: generateUUID(),
+        role: 'assistant',
+        content: 'Please attach a valid invoice file (PDF, JPEG, or PNG).',
+      });
       return;
     }
 
@@ -89,10 +95,14 @@ export function Chat({
         experimental_attachments: attachments,
       });
     } catch (error) {
-      toast.error('Failed to process invoice');
+      append({
+        id: generateUUID(),
+        role: 'assistant',
+        content: 'Failed to process invoice. Please try again.',
+      });
       setInvoiceProcessingStatus(undefined);
     }
-  }, [attachments, handleSubmit]);
+  }, [attachments, handleSubmit, append]);
 
   const handleFormSubmit = useCallback((event?: { preventDefault?: () => void }) => {
     if (input.toLowerCase().includes('process this invoice')) {
