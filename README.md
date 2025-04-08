@@ -1,3 +1,33 @@
+# HOAi Take-Home Assignment: AI-Powered Invoice Processing System
+
+## Implementation Approach
+
+This project was developed as part of a take-home interview assignment for HOAi, focusing on building an AI-powered invoice processing system. Here's my systematic approach to implementation:
+
+### 1. Planning and Documentation
+- Collaborated with AI to iteratively develop a granular, step-by-step implementation plan
+- Created comprehensive PRD documents breaking down features and requirements:
+  - [Invoice Processing Feature](docs/invoice-processing-feature.md)
+  - [Invoice Processing Todo List](docs/invoice-processing-feature-todo.md)
+  - [Invoice Table Feature](docs/invoice-table-feature.md)
+
+### 2. AI-Driven Development Strategy
+Successfully leveraged Claude 3.5 Sonnet through Cursor IDE by:
+- Breaking down complex features into manageable tasks
+- Using test-driven development (TDD) approach
+- Iterating on solutions while maintaining code quality
+- Ensuring proper error handling and edge cases
+- Following best practices for each technology in the stack
+
+### 3. Key Features Implemented
+- Conversational interface for invoice upload and processing
+- AI-powered information extraction (customer details, amounts, dates)
+- Invoice validation and duplicate detection
+- Interactive invoice management table
+- Token usage tracking and optimization
+
+## Technical Stack
+
 ## Features
 
 - [Next.js](https://nextjs.org) App Router
