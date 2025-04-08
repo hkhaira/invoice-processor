@@ -63,17 +63,35 @@ export async function POST(request: Request) {
   });
 
   const isInvoiceProcessing = userMessage.content?.toLowerCase().includes('process this invoice');
-  const invoiceSystemPrompt = `You are an expert invoice processor. Extract key information from the attached invoice including:
-       - Invoice number
-       - Date
-       - Due date
-       - Total amount
-       - Line items
-       - Vendor details
-       - Payment terms
-       Present the information in a clear, structured format.
-       If any information is missing or unclear, note that in your response.
-       If the file is not a valid invoice, politely inform the user.`;
+  const invoiceSystemPrompt = `You are an expert invoice processor with advanced capabilities in analyzing both PDF documents and images. Your task is to extract and structure the following information:
+
+  REQUIRED FIELDS (mark as 'Not Found' if missing):
+  - Invoice Number
+  - Invoice Date
+  - Due Date
+  - Amount
+  - Customer name
+  - Vendor name
+  
+  ADDITIONAL FIELDS (if present):
+  - Line Items (including quantity, description, unit price, total)
+  - Subtotal
+  - Tax Amount
+  - Payment Terms
+  - Payment Instructions
+  - Purchase Order Reference
+  
+  VALIDATION CHECKS:
+  - Verify mathematical accuracy of totals
+  - Check for missing required fields
+  - Flag any unusual or suspicious elements
+  
+  FORMAT YOUR RESPONSE AS FOLLOWS:
+  1. First, provide a brief summary of the document type and quality
+  2. Then list all found fields in a structured format
+  3. Finally, note any discrepancies, missing fields, or potential issues
+  
+  If the provided file is not an invoice, politely inform the user and explain why.`;
   
   const finalSystemPrompt = isInvoiceProcessing ? invoiceSystemPrompt : systemPrompt({ selectedChatModel });
 
@@ -85,13 +103,11 @@ export async function POST(request: Request) {
     };
 
     if (message.experimental_attachments?.length) {
-      // For data URLs, we need to extract the base64 data
       const attachments = message.experimental_attachments.map(attachment => {
         const url = attachment.url;
         const isPDF = attachment.contentType === 'application/pdf';
         
         if (isPDF) {
-          // For PDFs, use file type with base64 data
           const base64Data = url.split(',')[1];
           return {
             type: 'file' as const,
@@ -100,7 +116,6 @@ export async function POST(request: Request) {
             filename: attachment.name,
           };
         } else {
-          // For images, use image type with URL
           return {
             type: 'image' as const,
             image: new URL(url)
@@ -126,73 +141,94 @@ export async function POST(request: Request) {
   // Add expires to session for tool compatibility
   const sessionWithExpires = {
     ...session,
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  return createDataStreamResponse({
-    execute: (dataStream) => {
-      const result = streamText({
-        model: myProvider.languageModel(selectedChatModel),
-        system: finalSystemPrompt,
-        messages: transformedMessages,
-        maxSteps: 5,
-        experimental_activeTools:
-          selectedChatModel === 'chat-model-reasoning'
-            ? []
-            : [
-                'getWeather',
-                'createDocument',
-                'updateDocument',
-                'requestSuggestions',
-              ],
-        experimental_transform: smoothStream({ chunking: 'word' }),
-        experimental_generateMessageId: generateUUID,
-        tools: {
-          getWeather,
-          createDocument: createDocument({ session: sessionWithExpires, dataStream }),
-          updateDocument: updateDocument({ session: sessionWithExpires, dataStream }),
-          requestSuggestions: requestSuggestions({
-            session: sessionWithExpires,
-            dataStream,
-          }),
-        },
-        onFinish: async ({ response, reasoning }) => {
-          if (session.user?.id) {
-            try {
-              const sanitizedResponseMessages = sanitizeResponseMessages({
-                messages: response.messages,
-                reasoning,
-              });
+  // Set up timeout for 30 seconds
+  const timeoutMs = 30000;
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Processing timeout after 30 seconds')), timeoutMs);
+  });
 
-              await saveMessages({
-                messages: sanitizedResponseMessages.map((message) => {
-                  return {
+  return createDataStreamResponse({
+    execute: async (dataStream) => {
+      try {
+        const streamPromise = streamText({
+          model: myProvider.languageModel(selectedChatModel),
+          system: finalSystemPrompt,
+          messages: transformedMessages,
+          maxSteps: 5,
+          experimental_activeTools:
+            selectedChatModel === 'chat-model-reasoning'
+              ? []
+              : [
+                  'getWeather',
+                  'createDocument',
+                  'updateDocument',
+                  'requestSuggestions',
+                ],
+          experimental_transform: smoothStream({ 
+            chunking: 'word',
+          }),
+          experimental_generateMessageId: generateUUID,
+          tools: {
+            getWeather,
+            createDocument: createDocument({ session: sessionWithExpires, dataStream }),
+            updateDocument: updateDocument({ session: sessionWithExpires, dataStream }),
+            requestSuggestions: requestSuggestions({
+              session: sessionWithExpires,
+              dataStream,
+            }),
+          },
+          onFinish: async ({ response, reasoning }) => {
+            if (session.user?.id) {
+              try {
+                const sanitizedResponseMessages = sanitizeResponseMessages({
+                  messages: response.messages,
+                  reasoning,
+                });
+
+                await saveMessages({
+                  messages: sanitizedResponseMessages.map((message) => ({
                     id: message.id,
                     chatId: id,
                     role: message.role,
                     content: message.content,
                     createdAt: new Date(),
-                  };
-                }),
-              });
-            } catch (error) {
-              console.error('Failed to save chat');
+                  })),
+                });
+              } catch (error) {
+                console.error('Failed to save chat:', error);
+              }
             }
-          }
-        },
-        experimental_telemetry: {
-          isEnabled: true,
-          functionId: 'stream-text',
-        },
-      });
+          },
+          experimental_telemetry: {
+            isEnabled: true,
+            functionId: 'stream-text',
+          },
+        });
 
-      result.mergeIntoDataStream(dataStream, {
-        sendReasoning: true,
-      });
+        // Race between the stream and timeout
+        await Promise.race([
+          streamPromise.mergeIntoDataStream(dataStream, {
+            sendReasoning: true,
+          }),
+          timeoutPromise
+        ]);
+
+      } catch (error: any) {
+        if (error?.message === 'Processing timeout after 30 seconds') {
+          console.error('Processing timeout occurred');
+        }
+        throw error;
+      }
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
       console.error('Error in chat stream:', error);
-      return 'Oops, an error occurred!';
+      if (error instanceof Error && error.message === 'Processing timeout after 30 seconds') {
+        return 'The invoice processing took too long to complete. Please try again with a smaller file or contact support if the issue persists.';
+      }
+      return 'An error occurred while processing your invoice. Please ensure the file is a valid invoice document and try again.';
     },
   });
 }

@@ -64,7 +64,7 @@ Implement direct file processing using OpenAI's GPT-4o via Vercel AI SDK. GPT-4o
 
 **LLM Prompt:**
 ```
-Integrate Vercel AI SDK v4.1 with OpenAI GPT-4o for invoice processing. Use the multi-modal capabilities of GPT-4o to directly process PDF files and images. Create a prompt template that instructs the AI to extract specific invoice fields (customer name, vendor name, invoice number, dates, amount, line items) from the document. Implement streaming response handling to provide real-time feedback to the user. Add timeout handling for processes that exceed 30 seconds.
+Integrate Vercel AI SDK with OpenAI GPT-4o for invoice processing. Use the multi-modal capabilities of GPT-4o to directly process PDF files and images. Create a prompt template that instructs the AI to extract specific invoice fields (customer name, vendor name, invoice number, dates, amount, line items) from the document. Implement streaming response handling to provide real-time feedback to the user. Add timeout handling for processes that exceed 30 seconds.
 ```
 
 **Manual Validation:**
