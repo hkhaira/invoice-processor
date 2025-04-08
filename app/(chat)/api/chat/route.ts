@@ -3,6 +3,9 @@ import {
   createDataStreamResponse,
   smoothStream,
   streamText,
+  type CoreUserMessage,
+  type CoreAssistantMessage,
+  type CoreSystemMessage,
 } from 'ai';
 
 import { auth } from '@/app/(auth)/auth';
@@ -74,12 +77,64 @@ export async function POST(request: Request) {
   
   const finalSystemPrompt = isInvoiceProcessing ? invoiceSystemPrompt : systemPrompt({ selectedChatModel });
 
+  // Transform messages to include file attachments in the correct format
+  const transformedMessages = messages.map(message => {
+    const base = {
+      id: message.id,
+      role: message.role,
+    };
+
+    if (message.experimental_attachments?.length) {
+      // For data URLs, we need to extract the base64 data
+      const attachments = message.experimental_attachments.map(attachment => {
+        const url = attachment.url;
+        const isPDF = attachment.contentType === 'application/pdf';
+        
+        if (isPDF) {
+          // For PDFs, use file type with base64 data
+          const base64Data = url.split(',')[1];
+          return {
+            type: 'file' as const,
+            data: base64Data,
+            mimeType: attachment.contentType,
+            filename: attachment.name,
+          };
+        } else {
+          // For images, use image type with URL
+          return {
+            type: 'image' as const,
+            image: new URL(url)
+          };
+        }
+      });
+
+      return {
+        ...base,
+        content: [
+          { type: 'text' as const, text: message.content || '' },
+          ...attachments,
+        ],
+      } as CoreUserMessage | CoreAssistantMessage | CoreSystemMessage;
+    }
+
+    return {
+      ...base,
+      content: message.content,
+    } as CoreUserMessage | CoreAssistantMessage | CoreSystemMessage;
+  });
+
+  // Add expires to session for tool compatibility
+  const sessionWithExpires = {
+    ...session,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+  };
+
   return createDataStreamResponse({
     execute: (dataStream) => {
       const result = streamText({
         model: myProvider.languageModel(selectedChatModel),
         system: finalSystemPrompt,
-        messages,
+        messages: transformedMessages,
         maxSteps: 5,
         experimental_activeTools:
           selectedChatModel === 'chat-model-reasoning'
@@ -94,10 +149,10 @@ export async function POST(request: Request) {
         experimental_generateMessageId: generateUUID,
         tools: {
           getWeather,
-          createDocument: createDocument({ session, dataStream }),
-          updateDocument: updateDocument({ session, dataStream }),
+          createDocument: createDocument({ session: sessionWithExpires, dataStream }),
+          updateDocument: updateDocument({ session: sessionWithExpires, dataStream }),
           requestSuggestions: requestSuggestions({
-            session,
+            session: sessionWithExpires,
             dataStream,
           }),
         },
@@ -135,7 +190,8 @@ export async function POST(request: Request) {
         sendReasoning: true,
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Error in chat stream:', error);
       return 'Oops, an error occurred!';
     },
   });

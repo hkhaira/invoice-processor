@@ -14,10 +14,10 @@ Enhance the existing chat interface to support invoice processing commands. User
 ```
 
 **Manual Validation:**
-- [ ] Verify the chat interface recognizes "Process this invoice" command
-- [ ] Confirm the UI shows status updates during processing
-- [ ] Test error handling by uploading an invalid file
-- [ ] Check that the UI provides clear feedback to the user
+- [x] Verify the chat interface recognizes "Process this invoice" command
+- [x] Confirm the UI shows status updates during processing
+- [x] Test error handling by uploading an invalid file
+- [x] Check that the UI provides clear feedback to the user
 
 ### Step 2: File Upload Enhancement
 **Tasks:**
@@ -31,11 +31,11 @@ Enhance the existing file upload component to specifically handle invoice files 
 ```
 
 **Manual Validation:**
-- [ ] Test uploading PDF files and verify they're accepted
-- [ ] Test uploading image files (JPG, PNG) and verify they're accepted
-- [ ] Try uploading invalid file types and confirm rejection
-- [ ] Verify progress indicator appears during upload
-- [ ] Check client-side validation messages for invalid files
+- [x] Test uploading PDF files and verify they're accepted
+- [x] Test uploading image files (JPG, PNG) and verify they're accepted
+- [x] Try uploading invalid file types and confirm rejection
+- [x] Verify progress indicator appears during upload
+- [x] Check client-side validation messages for invalid files
 
 ### Step 3: Direct File Processing with GPT-4o
 **Tasks:**
@@ -49,11 +49,11 @@ Implement direct file processing using OpenAI's GPT-4o via Vercel AI SDK. GPT-4o
 ```
 
 **Manual Validation:**
-- [ ] Upload a PDF invoice and verify it's processed by GPT-4o
-- [ ] Upload an image invoice and verify it's processed without conversion
-- [ ] Check that file data is correctly formatted for GPT-4o consumption
-- [ ] Test with corrupted files and verify error handling
-- [ ] Confirm the API returns appropriate responses to the client
+- [x] Upload a PDF invoice and verify it's processed by GPT-4o
+- [x] Upload an image invoice and verify it's processed without conversion
+- [x] Check that file data is correctly formatted for GPT-4o consumption
+- [x] Test with corrupted files and verify error handling
+- [x] Confirm the API returns appropriate responses to the client
 
 ### Step 4: AI Integration with Vercel AI SDK
 **Tasks:**
