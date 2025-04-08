@@ -28,8 +28,69 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
+import { saveInvoice, type InvoiceData } from '@/lib/db/invoice-queries';
 
 export const maxDuration = 60;
+
+// Define the structured output schema for invoice data
+const invoiceSchema = {
+  type: 'object',
+  properties: {
+    validation: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['valid', 'invalid'] },
+        errors: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['status']
+    },
+    data: {
+      type: 'object',
+      properties: {
+        invoiceNumber: { type: 'string' },
+        issueDate: { type: 'string', format: 'date-time' },
+        dueDate: { type: 'string', format: 'date-time' },
+        totalAmount: { type: 'number' },
+        currency: { type: 'string', default: 'USD' },
+        customerName: { type: 'string' },
+        customerAddress: { type: 'string' },
+        customerContact: { type: 'string' },
+        customerTaxId: { type: 'string' },
+        vendorName: { type: 'string' },
+        vendorAddress: { type: 'string' },
+        vendorContact: { type: 'string' },
+        vendorTaxId: { type: 'string' },
+        paymentTerms: { type: 'string' },
+        notes: { type: 'string' },
+        lineItems: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              description: { type: 'string' },
+              quantity: { type: 'number' },
+              unitPrice: { type: 'number' },
+              totalPrice: { type: 'number' },
+              taxRate: { type: 'number' },
+              taxAmount: { type: 'number' },
+              sku: { type: 'string' },
+              category: { type: 'string' }
+            },
+            required: ['description', 'quantity', 'unitPrice', 'totalPrice']
+          }
+        }
+      },
+      required: ['invoiceNumber', 'issueDate', 'dueDate', 'totalAmount', 'customerName', 'vendorName']
+    }
+  },
+  required: ['validation', 'data']
+};
+
+// Add type for response format
+type ResponseFormat = {
+  type: 'json_object';
+  schema?: Record<string, any>;
+};
 
 export async function POST(request: Request) {
   const {
@@ -85,11 +146,11 @@ export async function POST(request: Request) {
      - Verify professional formatting and layout
      - Flag if document appears to be a template or draft
 
-  2. REQUIRED FIELDS VALIDATION (mark status for each: ✓ Found, ❌ Missing, ⚠️ Unclear)
+  2. REQUIRED FIELDS VALIDATION
      - Invoice Number: Must be unique identifier
-     - Issue Date: Must be clearly stated and in valid format
-     - Due Date: Must be specified and logically after issue date
-     - Total Amount: Must be clearly displayed with currency
+     - Issue Date: Must be clearly stated and in valid format (YYYY-MM-DDTHH:mm:ss.sssZ)
+     - Due Date: Must be specified and logically after issue date (YYYY-MM-DDTHH:mm:ss.sssZ)
+     - Total Amount: Must be clearly displayed with currency (as decimal number)
      - Vendor Information: Must include business name and at least one of (address, contact, registration number)
      - Customer Information: Must include recipient name and at least one of (address, contact)
      - Line Items: Must detail products/services with quantities and prices
@@ -109,31 +170,8 @@ export async function POST(request: Request) {
      - Check for duplicate invoice numbers if visible
      - Verify dates are within reasonable range (not future dated unless clearly marked as proforma)
 
-  FORMAT YOUR RESPONSE AS FOLLOWS:
-  1. PRE-VALIDATION CHECK
-     - Document Status: [Processable/Unprocessable]
-     - Content Quality: [Good/Poor/Unreadable]
-     - Structure Status: [Complete/Incomplete/Malformed]
-     If unprocessable, stop here and provide detailed explanation.
-
-  2. VALIDATION SUMMARY
-     - Document Type: [Invoice/Not Invoice]
-     - Confidence Level: [High/Medium/Low]
-     - Overall Status: [Valid/Invalid/Requires Review]
-
-  3. FIELD VALIDATION
-     [List each required field with status and details]
-
-  4. CALCULATIONS
-     - Line Items Total: [Match/Mismatch/Unable to Verify]
-     - Tax Calculation: [Correct/Incorrect/Not Applicable]
-     - Final Total: [Verified/Discrepancy Found]
-
-  5. ISSUES AND RECOMMENDATIONS
-     [List any problems found and specific actions needed]
-
   EDGE CASE HANDLING:
-  For the following scenarios, provide specific responses:
+  For the following scenarios, set validation.status to "invalid" and include specific error in validation.errors:
   - Empty/Blank Document: "The uploaded document appears to be empty. Please verify the file contains actual content."
   - Corrupted File: "The document content is unreadable. Please ensure the file is not corrupted and try uploading again."
   - Image-Only Document: "The document contains only images without text. Please provide a text-searchable version."
@@ -143,13 +181,36 @@ export async function POST(request: Request) {
   - Multiple Documents: "Multiple documents detected. Please upload a single invoice at a time."
 
   IF DOCUMENT IS NOT A VALID INVOICE:
-  - Explain specifically why it fails validation
-  - Identify what type of document it appears to be
-  - List missing critical elements
-  - Provide guidance on what a proper invoice should include
+  1. Set validation.status to "invalid"
+  2. Include in validation.errors:
+     - Specific reason why it fails validation
+     - What type of document it appears to be
+     - List of missing critical elements
+     - Guidance on what a proper invoice should include
 
-  Remember to maintain a professional tone while being clear and specific about any issues found.`;
-  
+  RESPONSE FORMAT:
+  You must respond with a JSON object matching this schema:
+  ${JSON.stringify(invoiceSchema, null, 2)}
+
+  If validation fails:
+  - Set validation.status to "invalid"
+  - Include detailed error messages in validation.errors array
+  - Leave data fields as null or empty strings
+
+  If validation succeeds:
+  - Set validation.status to "valid"
+  - Populate all required fields in the data object
+  - Convert all monetary values to decimal numbers
+  - Format dates in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)
+  - Include line items with proper calculations
+
+  Remember:
+  - Be precise with number formats (use decimal points for currency)
+  - Ensure dates are in correct ISO format
+  - Validate mathematical accuracy of line items
+  - Include all available optional fields when present in the document
+  - Maintain a professional tone while being clear and specific about any issues found`;
+
   const finalSystemPrompt = isInvoiceProcessing ? invoiceSystemPrompt : systemPrompt({ selectedChatModel });
 
   // Transform messages to include file attachments in the correct format
@@ -191,7 +252,7 @@ export async function POST(request: Request) {
 
     return {
       ...base,
-      content: message.content,
+      content: message.content || '',
     } as CoreUserMessage | CoreAssistantMessage | CoreSystemMessage;
   });
 
@@ -215,6 +276,9 @@ export async function POST(request: Request) {
           system: finalSystemPrompt,
           messages: transformedMessages,
           maxSteps: 5,
+          // @ts-expect-error - response_format and structuredOutputs are supported in newer versions
+          response_format: isInvoiceProcessing ? { type: "json_object", schema: invoiceSchema } : undefined,
+          structuredOutputs: isInvoiceProcessing,
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
               ? []
@@ -245,15 +309,99 @@ export async function POST(request: Request) {
                   reasoning,
                 });
 
+                // Save messages with proper content handling
                 await saveMessages({
-                  messages: sanitizedResponseMessages.map((message) => ({
-                    id: message.id,
-                    chatId: id,
-                    role: message.role,
-                    content: message.content,
-                    createdAt: new Date(),
-                  })),
+                  messages: sanitizedResponseMessages.map((message) => {
+                    let content = message.content;
+                    
+                    // Handle array content type
+                    if (Array.isArray(content)) {
+                      content = content
+                        .map(part => {
+                          if (typeof part === 'string') return part;
+                          if (part.type === 'text') return part.text;
+                          return '';
+                        })
+                        .join(' ')
+                        .trim();
+                    }
+
+                    return {
+                      id: message.id,
+                      chatId: id,
+                      role: message.role,
+                      content: content || '',
+                      createdAt: new Date(),
+                    };
+                  }),
                 });
+
+                // If this was invoice processing, try to save the validated data
+                if (isInvoiceProcessing) {
+                  try {
+                    // Get the last assistant message which should contain the validation results
+                    const lastMessage = sanitizedResponseMessages.find(m => m.role === 'assistant');
+                    if (!lastMessage) {
+                      console.error('No assistant message found in sanitized messages');
+                      dataStream.write(`0:Failed to find validation results. Please try again.\n`);
+                      return;
+                    }
+
+                    // Parse the structured output
+                    let parsedResponse;
+                    try {
+                      const content = typeof lastMessage.content === 'string' 
+                        ? lastMessage.content 
+                        : Array.isArray(lastMessage.content)
+                          ? lastMessage.content.map(part => typeof part === 'string' ? part : part.type === 'text' ? part.text : '').join(' ')
+                          : '';
+
+                      // Clean the content from markdown formatting
+                      const cleanedContent = content
+                        .replace(/```json\n?/g, '') // Remove ```json
+                        .replace(/```\n?/g, '')     // Remove closing ```
+                        .trim();                    // Remove extra whitespace
+                      
+                      console.log('Cleaned content for parsing:', cleanedContent);
+                      parsedResponse = JSON.parse(cleanedContent);
+                    } catch (error) {
+                      console.error('Failed to parse structured output:', error);
+                      console.error('Raw content:', lastMessage.content);
+                      dataStream.write(`0:Failed to parse validation results. Please try again.\n`);
+                      return;
+                    }
+
+                    // Check validation status
+                    if (parsedResponse.validation.status !== 'valid') {
+                      const errors = parsedResponse.validation.errors || ['Unknown validation error'];
+                      console.error('Document validation failed:', errors);
+                      dataStream.write(`0:Document validation failed. Issues found:\n${errors.join('\n')}\n`);
+                      return;
+                    }
+
+                    // Convert the structured output to our database format
+                    const invoiceData: InvoiceData = {
+                      ...parsedResponse.data,
+                      issueDate: new Date(parsedResponse.data.issueDate),
+                      dueDate: new Date(parsedResponse.data.dueDate),
+                      lineItems: parsedResponse.data.lineItems || []
+                    };
+
+                    // Save the validated invoice data
+                    const savedInvoice = await saveInvoice(invoiceData);
+                    console.log('Successfully saved invoice:', savedInvoice);
+                    
+                    // Append success message to the stream
+                    dataStream.write(`0:Invoice data has been successfully validated and saved to the database.\n`);
+                  } catch (error) {
+                    console.error('Failed to save invoice data:', error);
+                    if (error instanceof Error) {
+                      console.error('Error details:', error.message);
+                      console.error('Error stack:', error.stack);
+                    }
+                    dataStream.write(`0:Failed to save invoice data to the database. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or contact support.\n`);
+                  }
+                }
               } catch (error) {
                 console.error('Failed to save chat:', error);
               }

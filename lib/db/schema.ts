@@ -99,3 +99,54 @@ export const suggestion = sqliteTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const invoice = sqliteTable('Invoice', {
+  id: text('id').primaryKey().notNull(),
+  createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+  invoiceNumber: text('invoiceNumber').notNull(),
+  issueDate: integer('issueDate', { mode: 'timestamp' }).notNull(),
+  dueDate: integer('dueDate', { mode: 'timestamp' }).notNull(),
+  totalAmount: integer('totalAmount').notNull(), // Stored in cents
+  currency: text('currency').notNull().default('USD'),
+  status: text('status')
+    .notNull()
+    .default('pending')
+    .$type<'pending' | 'validated' | 'invalid' | 'processed'>(),
+  
+  // Customer Information
+  customerName: text('customerName').notNull(),
+  customerAddress: text('customerAddress'),
+  customerContact: text('customerContact'),
+  customerTaxId: text('customerTaxId'),
+  
+  // Vendor Information
+  vendorName: text('vendorName').notNull(),
+  vendorAddress: text('vendorAddress'),
+  vendorContact: text('vendorContact'),
+  vendorTaxId: text('vendorTaxId'),
+  
+  // Additional Fields
+  paymentTerms: text('paymentTerms'),
+  notes: text('notes'),
+  originalFileUrl: text('originalFileUrl'),
+  processingErrors: blob('processingErrors', { mode: 'json' }),
+});
+
+export type Invoice = InferSelectModel<typeof invoice>;
+
+export const invoiceLineItem = sqliteTable('InvoiceLineItem', {
+  id: text('id').primaryKey().notNull(),
+  invoiceId: text('invoiceId')
+    .notNull()
+    .references(() => invoice.id),
+  description: text('description').notNull(),
+  quantity: integer('quantity').notNull(),
+  unitPrice: integer('unitPrice').notNull(), // Stored in cents
+  totalPrice: integer('totalPrice').notNull(), // Stored in cents
+  taxRate: integer('taxRate'), // Optional tax rate in basis points (e.g., 2000 = 20%)
+  taxAmount: integer('taxAmount'), // Optional tax amount in cents
+  sku: text('sku'), // Optional product/service identifier
+  category: text('category'), // Optional categorization
+});
+
+export type InvoiceLineItem = InferSelectModel<typeof invoiceLineItem>;

@@ -68,11 +68,11 @@ Integrate Vercel AI SDK with OpenAI GPT-4o for invoice processing. Use the multi
 ```
 
 **Manual Validation:**
-- [ ] Verify AI SDK integration by checking for streaming responses
-- [ ] Test with a sample invoice to see if fields are correctly extracted
-- [ ] Check that streaming updates appear in the UI
-- [ ] Test timeout handling by using a very large/complex document
-- [ ] Verify extracted data structure matches expected format
+- [x] Verify AI SDK integration by checking for streaming responses
+- [x] Test with a sample invoice to see if fields are correctly extracted
+- [x] Check that streaming updates appear in the UI
+- [x] Test timeout handling by using a very large/complex document
+- [x] Verify extracted data structure matches expected format
 
 ### Step 5: Invoice Validation Logic
 **Tasks:**
@@ -86,11 +86,11 @@ Develop an AI-based invoice validation system using GPT-4o via the Vercel AI SDK
 ```
 
 **Manual Validation:**
-- [ ] Test with a valid invoice and verify successful validation
-- [ ] Test with a receipt or statement (not an invoice) and verify rejection
-- [ ] Test with an invoice missing required fields and check feedback
-- [ ] Verify rejection messages are clear and actionable
-- [ ] Check that validation results are displayed to the user
+- [x] Test with a valid invoice and verify successful validation
+- [x] Test with a receipt or statement (not an invoice) and verify rejection
+- [x] Test with an invoice missing required fields and check feedback
+- [x] Verify rejection messages are clear and actionable
+- [x] Check that validation results are displayed to the user
 
 ### Step 6: Project Analysis and Schema Design
 **Tasks:**

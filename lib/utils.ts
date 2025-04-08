@@ -141,6 +141,7 @@ export function sanitizeResponseMessages({
 }) {
   const toolResultIds: Array<string> = [];
 
+  // First, collect all tool result IDs
   for (const message of messages) {
     if (message.role === 'tool') {
       for (const content of message.content) {
@@ -151,33 +152,63 @@ export function sanitizeResponseMessages({
     }
   }
 
+  console.log('Processing messages for sanitization:', messages.length, 'messages');
+
   const messagesBySanitizedContent = messages.map((message) => {
     if (message.role !== 'assistant') return message;
 
-    if (typeof message.content === 'string') return message;
+    if (typeof message.content === 'string') {
+      console.log('Processing string content:', message.content.substring(0, 100) + '...');
+      return message;
+    }
 
-    const sanitizedContent = message.content.filter((content) =>
-      content.type === 'tool-call'
-        ? toolResultIds.includes(content.toolCallId)
-        : content.type === 'text'
-          ? content.text.length > 0
-          : true,
-    );
+    console.log('Processing array content, parts:', message.content.length);
+    
+    const sanitizedContent = message.content.filter((content) => {
+      if (content.type === 'tool-call') {
+        return toolResultIds.includes(content.toolCallId);
+      }
+      if (content.type === 'text') {
+        const hasContent = content.text.length > 0;
+        if (hasContent) {
+          console.log('Found text content:', content.text.substring(0, 100) + '...');
+        }
+        return hasContent;
+      }
+      return true;
+    });
 
     if (reasoning) {
+      console.log('Adding reasoning to content');
       // @ts-expect-error: reasoning message parts in sdk is wip
       sanitizedContent.push({ type: 'reasoning', reasoning });
     }
 
-    return {
+    const result = {
       ...message,
       content: sanitizedContent,
     };
+
+    console.log('Sanitized message content parts:', result.content.length);
+    return result;
   });
 
-  return messagesBySanitizedContent.filter(
-    (message) => message.content.length > 0,
+  const filteredMessages = messagesBySanitizedContent.filter(
+    (message) => {
+      const hasContent = Array.isArray(message.content) 
+        ? message.content.length > 0 
+        : (typeof message.content === 'string' ? message.content.length > 0 : false);
+      
+      if (!hasContent) {
+        console.log('Filtering out empty message:', message.role);
+      }
+      
+      return hasContent;
+    }
   );
+
+  console.log('Final sanitized message count:', filteredMessages.length);
+  return filteredMessages;
 }
 
 export function sanitizeUIMessages(messages: Array<Message>): Array<Message> {

@@ -8,6 +8,13 @@
       "when": 1739483549686,
       "tag": "0000_perfect_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1744083396408,
+      "tag": "0001_right_captain_cross",
+      "breakpoints": true
     }
   ]
 }
