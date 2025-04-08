@@ -2,7 +2,7 @@
 
 import type { Attachment, Message } from 'ai';
 import { useChat } from 'ai/react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 
 import { ChatHeader } from '@/components/chat-header';
@@ -28,6 +28,7 @@ export function Chat({
   selectedVisibilityType: VisibilityType;
 }) {
   const { mutate } = useSWRConfig();
+  const [invoiceProcessingStatus, setInvoiceProcessingStatus] = useState<string | undefined>();
 
   const {
     messages,
@@ -48,9 +49,11 @@ export function Chat({
     generateId: generateUUID,
     onFinish: () => {
       mutate('/api/history');
+      setInvoiceProcessingStatus(undefined);
     },
     onError: (error) => {
-      toast.error('An error occured, please try again!');
+      toast.error('An error occurred, please try again!');
+      setInvoiceProcessingStatus(undefined);
     },
   });
 
@@ -61,6 +64,43 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<Array<Attachment>>([]);
   const isBlockVisible = useBlockSelector((state) => state.isVisible);
+
+  const handleInvoiceProcessing = useCallback(async (event?: { preventDefault?: () => void }) => {
+    if (event?.preventDefault) {
+      event.preventDefault();
+    }
+
+    if (!attachments.length) {
+      toast.error('Please attach an invoice file first');
+      return;
+    }
+
+    const invoiceFile = attachments[0];
+    const contentType = invoiceFile.contentType || '';
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(contentType)) {
+      toast.error('Please attach a valid invoice file (PDF, JPEG, or PNG)');
+      return;
+    }
+
+    setInvoiceProcessingStatus('Processing invoice...');
+    
+    try {
+      await handleSubmit(event, {
+        experimental_attachments: attachments,
+      });
+    } catch (error) {
+      toast.error('Failed to process invoice');
+      setInvoiceProcessingStatus(undefined);
+    }
+  }, [attachments, handleSubmit]);
+
+  const handleFormSubmit = useCallback((event?: { preventDefault?: () => void }) => {
+    if (input.toLowerCase().includes('process this invoice')) {
+      handleInvoiceProcessing(event);
+    } else {
+      handleSubmit(event);
+    }
+  }, [input, handleInvoiceProcessing, handleSubmit]);
 
   return (
     <>
@@ -81,6 +121,7 @@ export function Chat({
           reload={reload}
           isReadonly={false}
           isBlockVisible={isBlockVisible}
+          invoiceProcessingStatus={invoiceProcessingStatus}
         />
 
         <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
@@ -88,7 +129,7 @@ export function Chat({
             chatId={id}
             input={input}
             setInput={setInput}
-            handleSubmit={handleSubmit}
+            handleSubmit={handleFormSubmit}
             isLoading={isLoading}
             stop={stop}
             attachments={attachments}
@@ -104,7 +145,7 @@ export function Chat({
         chatId={id}
         input={input}
         setInput={setInput}
-        handleSubmit={handleSubmit}
+        handleSubmit={handleFormSubmit}
         isLoading={isLoading}
         stop={stop}
         attachments={attachments}

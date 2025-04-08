@@ -1,5 +1,5 @@
 import type { ChatRequestOptions, Message } from 'ai';
-import { PreviewMessage, ThinkingMessage } from './message';
+import { PreviewMessage, ThinkingMessage, InvoiceProcessingMessage } from './message';
 import { useScrollToBottom } from './use-scroll-to-bottom';
 import { Overview } from './overview';
 import { memo } from 'react';
@@ -19,6 +19,7 @@ interface MessagesProps {
   ) => Promise<string | null | undefined>;
   isReadonly: boolean;
   isBlockVisible: boolean;
+  invoiceProcessingStatus?: string;
 }
 
 function PureMessages({
@@ -29,6 +30,8 @@ function PureMessages({
   setMessages,
   reload,
   isReadonly,
+  isBlockVisible,
+  invoiceProcessingStatus,
 }: MessagesProps) {
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
@@ -59,7 +62,12 @@ function PureMessages({
 
       {isLoading &&
         messages.length > 0 &&
-        messages[messages.length - 1].role === 'user' && <ThinkingMessage />}
+        messages[messages.length - 1].role === 'user' && 
+        (invoiceProcessingStatus ? (
+          <InvoiceProcessingMessage status={invoiceProcessingStatus} />
+        ) : (
+          <ThinkingMessage />
+        ))}
 
       <div
         ref={messagesEndRef}

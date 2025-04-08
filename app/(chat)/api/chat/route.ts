@@ -59,11 +59,26 @@ export async function POST(request: Request) {
     messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
   });
 
+  const isInvoiceProcessing = userMessage.content?.toLowerCase().includes('process this invoice');
+  const invoiceSystemPrompt = `You are an expert invoice processor. Extract key information from the attached invoice including:
+       - Invoice number
+       - Date
+       - Due date
+       - Total amount
+       - Line items
+       - Vendor details
+       - Payment terms
+       Present the information in a clear, structured format.
+       If any information is missing or unclear, note that in your response.
+       If the file is not a valid invoice, politely inform the user.`;
+  
+  const finalSystemPrompt = isInvoiceProcessing ? invoiceSystemPrompt : systemPrompt({ selectedChatModel });
+
   return createDataStreamResponse({
     execute: (dataStream) => {
       const result = streamText({
         model: myProvider.languageModel(selectedChatModel),
-        system: systemPrompt({ selectedChatModel }),
+        system: finalSystemPrompt,
         messages,
         maxSteps: 5,
         experimental_activeTools:
@@ -121,7 +136,7 @@ export async function POST(request: Request) {
       });
     },
     onError: () => {
-      return 'Oops, an error occured!';
+      return 'Oops, an error occurred!';
     },
   });
 }
